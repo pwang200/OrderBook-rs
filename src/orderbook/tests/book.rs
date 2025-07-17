@@ -534,12 +534,8 @@ mod tests {
     }
 
     #[test]
-    fn test_market_close_timestamp() {
+    fn test_day_order_rejection() {
         let book = OrderBook::new("BTCUSD");
-
-        // Set market close timestamp
-        let close_time = crate::utils::current_time_millis() + 1000;
-        book.set_market_close_timestamp(close_time);
 
         // Create a DAY order
         let order = OrderType::Standard {
@@ -551,12 +547,9 @@ mod tests {
             time_in_force: TimeInForce::Day,
         };
 
-        // Order should be accepted
+        // Order should be rejected in blockchain environment
         let result = book.add_order(order);
-        assert!(result.is_ok());
-
-        // Clear market close
-        book.clear_market_close_timestamp();
+        assert!(result.is_err());
     }
 }
 
@@ -572,32 +565,21 @@ mod test_orderbook_book {
     }
 
     #[test]
-    fn test_market_close_timestamp() {
+    fn test_day_order_rejection_in_blockchain() {
         let book = OrderBook::new("TEST");
 
-        // Set market close timestamp
-        let close_time = crate::utils::current_time_millis() + 60000; // 1 minute in the future
-        book.set_market_close_timestamp(close_time);
-
-        // Add a standard limit order with DAY time-in-force
+        // DAY orders should be rejected in blockchain environment
         let id = create_order_id();
         let result = book.add_limit_order(id, 1000, 10, Side::Buy, TimeInForce::Day);
-        assert!(result.is_ok());
+        assert!(result.is_err());
 
-        // Order should be in the book
-        assert!(book.get_order(id).is_some());
-
-        // Clear market close timestamp
-        book.clear_market_close_timestamp();
-
-        // Update with a time past the original close
-        let past_close_time = close_time + 1000;
-        book.set_market_close_timestamp(past_close_time);
-
-        // Add another day order
-        let id2 = create_order_id();
-        let result = book.add_limit_order(id2, 1000, 10, Side::Buy, TimeInForce::Day);
-        assert!(result.is_ok());
+        // Verify error type
+        match result {
+            Err(crate::OrderBookError::UnsupportedTimeInForce { time_in_force }) => {
+                assert_eq!(time_in_force, "DAY");
+            }
+            _ => panic!("Expected UnsupportedTimeInForce error"),
+        }
     }
 
     #[test]
@@ -729,40 +711,20 @@ mod test_book_remaining {
     }
 
     #[test]
-    fn test_market_close_accessors() {
+    fn test_blockchain_24_7_operation() {
         let book = OrderBook::new("TEST");
 
-        // Initially, market close is not set
-        assert!(
-            !book
-                .has_market_close
-                .load(std::sync::atomic::Ordering::Relaxed)
-        );
+        // Blockchain operates 24/7 - no market close concept
+        // Test that we can add orders at any time
+        let id = create_order_id();
+        let result = book.add_limit_order(id, 1000, 10, Side::Buy, TimeInForce::Gtc);
+        assert!(result.is_ok());
 
-        // Set market close timestamp
-        let timestamp = 12345678;
-        book.set_market_close_timestamp(timestamp);
+        // Verify order was added
+        assert!(book.get_order(id).is_some());
 
-        // Verify it was set correctly
-        assert!(
-            book.has_market_close
-                .load(std::sync::atomic::Ordering::Relaxed)
-        );
-        assert_eq!(
-            book.market_close_timestamp
-                .load(std::sync::atomic::Ordering::Relaxed),
-            timestamp
-        );
-
-        // Clear market close timestamp
-        book.clear_market_close_timestamp();
-
-        // Verify it was cleared
-        assert!(
-            !book
-                .has_market_close
-                .load(std::sync::atomic::Ordering::Relaxed)
-        );
+        // Test that the order book is always ready for trading
+        assert_eq!(book.best_bid(), Some(1000));
     }
 
     #[test]

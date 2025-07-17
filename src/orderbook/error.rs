@@ -40,6 +40,12 @@ pub enum OrderBookError {
         /// Description of the error
         message: String,
     },
+
+    /// Unsupported TimeInForce type
+    UnsupportedTimeInForce {
+        /// The unsupported time in force
+        time_in_force: String,
+    },
 }
 
 impl fmt::Display for OrderBookError {
@@ -72,6 +78,13 @@ impl fmt::Display for OrderBookError {
             }
             OrderBookError::InvalidOperation { message } => {
                 write!(f, "Invalid operation: {}", message)
+            }
+            OrderBookError::UnsupportedTimeInForce { time_in_force } => {
+                write!(
+                    f,
+                    "Unsupported TimeInForce: {}. DAY orders not supported in blockchain environment",
+                    time_in_force
+                )
             }
         }
     }

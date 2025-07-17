@@ -1,4 +1,4 @@
-use crate::{OrderBook, OrderBookError, current_time_millis};
+use crate::{OrderBook, OrderBookError};
 use pricelevel::{OrderType, Side};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -8,16 +8,10 @@ impl OrderBook {
     /// Check if an order has expired
     pub(super) fn has_expired(&self, order: &OrderType) -> bool {
         let time_in_force = order.time_in_force();
-        let current_time = current_time_millis();
+        let current_time = self.time_provider.current_time();
 
-        // Only check market close timestamp if we have one set
-        let market_close = if self.has_market_close.load(Ordering::Relaxed) {
-            Some(self.market_close_timestamp.load(Ordering::Relaxed))
-        } else {
-            None
-        };
-
-        time_in_force.is_expired(current_time, market_close)
+        // No market close for blockchain - pass None
+        time_in_force.is_expired(current_time, None)
     }
 
     /// Check if there would be a price crossing
@@ -170,43 +164,50 @@ mod test_orderbook_private {
     }
 
     #[test]
-    fn test_has_expired_with_no_market_close() {
+    fn test_has_expired_gtd_order() {
+        use crate::time::{MockTimeProvider, TimeProvider};
+        use std::sync::Arc;
+
+        // Create a mock time provider with initial time 1000
+        let time_provider = Arc::new(MockTimeProvider::new(1000));
+        let book = OrderBook::new_with_time_provider("TEST", time_provider.clone());
+
+        // Create a GTD order that expires at 2000
+        let order = OrderType::Standard {
+            id: create_order_id(),
+            price: 1000,
+            quantity: 10,
+            side: Side::Buy,
+            timestamp: time_provider.current_time(),
+            time_in_force: TimeInForce::Gtd(2000),
+        };
+
+        // Order should not be expired yet
+        assert!(!book.has_expired(&order));
+
+        // Advance time to 2000
+        time_provider.set_time(2000);
+
+        // Order should now be expired
+        assert!(book.has_expired(&order));
+    }
+
+    #[test]
+    fn test_has_expired_gtc_order() {
         let book = OrderBook::new("TEST");
 
-        // Create a day order
+        // Create a GTC order (never expires)
         let order = OrderType::Standard {
             id: create_order_id(),
             price: 1000,
             quantity: 10,
             side: Side::Buy,
             timestamp: crate::utils::current_time_millis(),
-            time_in_force: TimeInForce::Day,
+            time_in_force: TimeInForce::Gtc,
         };
 
-        // Day order should not expire if market close is not set
+        // GTC order should never expire
         assert!(!book.has_expired(&order));
-    }
-
-    #[test]
-    fn test_has_expired_with_market_close() {
-        let book = OrderBook::new("TEST");
-
-        // Set market close to a past time
-        let current_time = crate::utils::current_time_millis();
-        book.set_market_close_timestamp(current_time - 1000); // 1 second ago
-
-        // Create a day order
-        let order = OrderType::Standard {
-            id: create_order_id(),
-            price: 1000,
-            quantity: 10,
-            side: Side::Buy,
-            timestamp: current_time,
-            time_in_force: TimeInForce::Day,
-        };
-
-        // Day order should expire if market close is in the past
-        assert!(book.has_expired(&order));
     }
 
     #[test]

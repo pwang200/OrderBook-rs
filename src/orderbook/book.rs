@@ -2,7 +2,7 @@
 
 use super::error::OrderBookError;
 use super::snapshot::OrderBookSnapshot;
-use crate::utils::current_time_millis;
+use crate::time::TimeProvider;
 use dashmap::DashMap;
 use pricelevel::{MatchResult, OrderId, OrderType, PriceLevel, Side, UuidGenerator};
 use std::collections::HashMap;
@@ -38,16 +38,21 @@ pub struct OrderBook {
     /// Flag indicating if there was a trade
     pub(super) has_traded: AtomicBool,
 
-    /// The timestamp of market close, if applicable (for DAY orders)
-    pub(super) market_close_timestamp: AtomicU64,
-
-    /// Flag indicating if market close is set
-    pub(super) has_market_close: AtomicBool,
+    /// Time provider for getting current time
+    pub(super) time_provider: Arc<dyn TimeProvider>,
 }
 
 impl OrderBook {
-    /// Create a new order book for the given symbol
+    /// Create a new order book for the given symbol using the global time provider
+    /// This maintains backward compatibility with existing code
     pub fn new(symbol: &str) -> Self {
+        // Use the global time provider for backward compatibility
+        let time_provider = Arc::new(crate::time::SystemTimeProvider);
+        Self::new_with_time_provider(symbol, time_provider)
+    }
+
+    /// Create a new order book with a custom time provider
+    pub fn new_with_time_provider(symbol: &str, time_provider: Arc<dyn TimeProvider>) -> Self {
         // Create a unique namespace for this order book's transaction IDs
         let namespace = Uuid::new_v4();
 
@@ -59,30 +64,19 @@ impl OrderBook {
             transaction_id_generator: UuidGenerator::new(namespace),
             last_trade_price: AtomicU64::new(0),
             has_traded: AtomicBool::new(false),
-            market_close_timestamp: AtomicU64::new(0),
-            has_market_close: AtomicBool::new(false),
+            time_provider,
         }
+    }
+
+    /// Create a new order book with block time provider for blockchain environments
+    pub fn new_with_block_time(symbol: &str, initial_time: u64) -> Self {
+        let time_provider = Arc::new(crate::time::BlockTimeProvider::new(initial_time));
+        Self::new_with_time_provider(symbol, time_provider)
     }
 
     /// Get the symbol of this order book
     pub fn symbol(&self) -> &str {
         &self.symbol
-    }
-
-    /// Set the market close timestamp for DAY orders
-    pub fn set_market_close_timestamp(&self, timestamp: u64) {
-        self.market_close_timestamp
-            .store(timestamp, Ordering::SeqCst);
-        self.has_market_close.store(true, Ordering::SeqCst);
-        trace!(
-            "Order book {}: Set market close timestamp to {}",
-            self.symbol, timestamp
-        );
-    }
-
-    /// Clear the market close timestamp
-    pub fn clear_market_close_timestamp(&self) {
-        self.has_market_close.store(false, Ordering::SeqCst);
     }
 
     /// Get the best bid price, if any
@@ -340,7 +334,7 @@ impl OrderBook {
 
         OrderBookSnapshot {
             symbol: self.symbol.clone(),
-            timestamp: current_time_millis(),
+            timestamp: self.time_provider.current_time(),
             bids: bid_levels,
             asks: ask_levels,
         }

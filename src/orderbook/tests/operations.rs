@@ -43,6 +43,29 @@ mod tests {
     }
 
     #[test]
+    fn test_add_limit_order_rejects_day_orders() {
+        let order_book = create_test_order_book();
+        let id = new_order_id();
+        let price = 1000;
+        let quantity = 10;
+        let side = Side::Buy;
+        let time_in_force = TimeInForce::Day;
+
+        let result = order_book.add_limit_order(id, price, quantity, side, time_in_force);
+        assert!(result.is_err(), "Adding a DAY order should fail");
+
+        match result {
+            Err(OrderBookError::UnsupportedTimeInForce { time_in_force }) => {
+                assert_eq!(
+                    time_in_force, "DAY",
+                    "Error should specify DAY time in force"
+                );
+            }
+            _ => panic!("Expected UnsupportedTimeInForce error"),
+        }
+    }
+
+    #[test]
     fn test_add_iceberg_order() {
         let order_book = create_test_order_book();
         let id = new_order_id();
@@ -88,6 +111,37 @@ mod tests {
     }
 
     #[test]
+    fn test_add_iceberg_order_rejects_day_orders() {
+        let order_book = create_test_order_book();
+        let id = new_order_id();
+        let price = 1000;
+        let visible_quantity = 10;
+        let hidden_quantity = 90;
+        let side = Side::Sell;
+        let time_in_force = TimeInForce::Day;
+
+        let result = order_book.add_iceberg_order(
+            id,
+            price,
+            visible_quantity,
+            hidden_quantity,
+            side,
+            time_in_force,
+        );
+        assert!(result.is_err(), "Adding a DAY iceberg order should fail");
+
+        match result {
+            Err(OrderBookError::UnsupportedTimeInForce { time_in_force }) => {
+                assert_eq!(
+                    time_in_force, "DAY",
+                    "Error should specify DAY time in force"
+                );
+            }
+            _ => panic!("Expected UnsupportedTimeInForce error"),
+        }
+    }
+
+    #[test]
     fn test_add_post_only_order() {
         let order_book = create_test_order_book();
         let id = new_order_id();
@@ -114,6 +168,29 @@ mod tests {
         // Verify the order is in the book
         let book_order = order_book.get_order(id);
         assert!(book_order.is_some(), "Order should be in the book");
+    }
+
+    #[test]
+    fn test_add_post_only_order_rejects_day_orders() {
+        let order_book = create_test_order_book();
+        let id = new_order_id();
+        let price = 1000;
+        let quantity = 10;
+        let side = Side::Buy;
+        let time_in_force = TimeInForce::Day;
+
+        let result = order_book.add_post_only_order(id, price, quantity, side, time_in_force);
+        assert!(result.is_err(), "Adding a DAY post-only order should fail");
+
+        match result {
+            Err(OrderBookError::UnsupportedTimeInForce { time_in_force }) => {
+                assert_eq!(
+                    time_in_force, "DAY",
+                    "Error should specify DAY time in force"
+                );
+            }
+            _ => panic!("Expected UnsupportedTimeInForce error"),
+        }
     }
 
     #[test]

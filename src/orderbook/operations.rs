@@ -16,6 +16,12 @@ impl OrderBook {
         side: Side,
         time_in_force: TimeInForce,
     ) -> Result<Arc<OrderType>, OrderBookError> {
+        // Reject DAY orders since blockchain runs 24/7
+        if matches!(time_in_force, TimeInForce::Day) {
+            return Err(OrderBookError::UnsupportedTimeInForce {
+                time_in_force: "DAY".to_string(),
+            });
+        }
         let order = OrderType::Standard {
             id,
             price,
@@ -41,6 +47,12 @@ impl OrderBook {
         side: Side,
         time_in_force: TimeInForce,
     ) -> Result<Arc<OrderType>, OrderBookError> {
+        // Reject DAY orders since blockchain runs 24/7
+        if matches!(time_in_force, TimeInForce::Day) {
+            return Err(OrderBookError::UnsupportedTimeInForce {
+                time_in_force: "DAY".to_string(),
+            });
+        }
         let order = OrderType::IcebergOrder {
             id,
             price,
@@ -66,6 +78,12 @@ impl OrderBook {
         side: Side,
         time_in_force: TimeInForce,
     ) -> Result<Arc<OrderType>, OrderBookError> {
+        // Reject DAY orders since blockchain runs 24/7
+        if matches!(time_in_force, TimeInForce::Day) {
+            return Err(OrderBookError::UnsupportedTimeInForce {
+                time_in_force: "DAY".to_string(),
+            });
+        }
         let order = OrderType::PostOnly {
             id,
             price,

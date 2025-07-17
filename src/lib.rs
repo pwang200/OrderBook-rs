@@ -133,8 +133,9 @@
 //! This analysis confirms that the system design is highly scalable and appropriate for demanding financial applications requiring high-speed processing with data consistency.
 
 mod orderbook;
-
+mod time;
 mod utils;
 
 pub use orderbook::{OrderBook, OrderBookError, OrderBookSnapshot};
+pub use time::{BlockTimeProvider, MockTimeProvider, SystemTimeProvider, TimeProvider};
 pub use utils::current_time_millis;

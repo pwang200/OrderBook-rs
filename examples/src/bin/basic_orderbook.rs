@@ -1,9 +1,8 @@
 // examples/src/bin/basic_orderbook.rs
 
-use orderbook_rs::{OrderBook, current_time_millis};
+use orderbook_rs::OrderBook;
 use pricelevel::{OrderId, Side, TimeInForce, setup_logger};
-use std::time::{Duration, Instant};
-use tracing::{Level, info};
+use tracing::info;
 use uuid::Uuid;
 
 fn main() {
@@ -41,12 +40,9 @@ fn create_orderbook(symbol: &str) -> OrderBook {
     info!("Creating OrderBook for symbol: {}", symbol);
     let book = OrderBook::new(symbol);
 
-    // Set market close timestamp for DAY orders (e.g., 8 hours from now)
-    let current_time = current_time_millis();
-    let market_close = current_time + (8 * 60 * 60 * 1000); // 8 hours in milliseconds
-    book.set_market_close_timestamp(market_close);
-
-    info!("Created OrderBook with market close at: {}", market_close);
+    // Note: In blockchain environments, markets operate 24/7 with no market close
+    // DAY orders are not supported in blockchain environments
+    info!("Created OrderBook for 24/7 blockchain trading");
     book
 }
 

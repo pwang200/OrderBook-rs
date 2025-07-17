@@ -370,6 +370,13 @@ impl OrderBook {
         let price = order.price();
         let side = order.side();
 
+        // Check for unsupported DAY orders in blockchain environment
+        if matches!(order.time_in_force(), pricelevel::TimeInForce::Day) {
+            return Err(OrderBookError::UnsupportedTimeInForce {
+                time_in_force: "DAY".to_string(),
+            });
+        }
+
         // Check if the order has expired before adding
         if self.has_expired(&order) {
             return Err(OrderBookError::InvalidOperation {
